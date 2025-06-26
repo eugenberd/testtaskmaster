@@ -1,0 +1,6 @@
+1. create frontend for easy socks shop (python).
+2. create middelware for socks shop, it should worked with frontend together (go).
+3. crate db with mysql, it should be user by middelware.
+4. all component should worked together.
+5. write docker compose file for testing of all component, and easy test FE, MW, DB parallel.
+6. write all deployment and service from all component for kubernetes
