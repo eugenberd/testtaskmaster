@@ -13,15 +13,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Запуск контейнера для теста
-      - name: Change directory
-        run: |
-          cd node
+
           
       # Проверяем код из репозитория
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Запуск контейнера для теста
+      - name: Change directory
+        run: |
+          cd node
+          
       # Устанавливаем Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
