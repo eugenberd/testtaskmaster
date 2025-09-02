@@ -1,4 +1,4 @@
-name: Build and Test Docker Image
+name: Build, Test and Scan Docker Image
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  build-and-test:
+  build-test-scan:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,11 +23,33 @@ jobs:
 
       # Сборка Docker-образа
       - name: Build Docker image
-        run: cd node; docker build -t node-hello-world .
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: node-hello-world:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # Запуск контейнера для теста
       - name: Run Docker container
         run: |
-          docker run -d -p 3000:3000 --name node-app node-hello-world
-          sleep 5 # Даем время серверу запуститься
+          docker run -d -p 3000:3000 --name node-app node-hello-world:latest
+          sleep 5
           curl --fail http://localhost:3000 || exit 1
+
+      # Проверка контейнера на уязвимости с помощью Trivy
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: node-hello-world:latest
+          format: table
+          exit-code: 1
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      # Останавливаем и очищаем контейнер
+      - name: Stop and remove container
+        if: always()
+        run: docker rm -f node-app
