@@ -13,6 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Запуск контейнера для теста
+      - name: Change directory
+        run: |
+          cd node
+          
       # Проверяем код из репозитория
       - name: Checkout code
         uses: actions/checkout@v4
