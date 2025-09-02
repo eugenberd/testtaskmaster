@@ -85,7 +85,7 @@ jobs:
       # 🔹 Container Scan (Trivy)
       #####################################
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@v0.20.0
+        uses: aquasecurity/trivy-action@v0.32.0
         with:
           image-ref: node-hello-world:latest
           format: json
