@@ -35,6 +35,7 @@ jobs:
       # Запуск контейнера для теста
       - name: Run Docker container
         run: |
+          cd node
           docker run -d -p 3000:3000 --name node-app node-hello-world:latest
           sleep 5
           curl --fail http://localhost:3000 || exit 1
