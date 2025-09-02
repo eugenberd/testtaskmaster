@@ -85,7 +85,11 @@ jobs:
       # 🔹 Container Scan (Trivy)
       #####################################
       - name: Scan Docker image with Trivy
-        run: trivy image --format json --output trivy-report.json node-hello-world:latest
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: node-hello-world:latest
+          format: json
+          output: trivy-report.json
 
       - name: Upload Trivy report
         uses: actions/upload-artifact@v4
@@ -136,4 +140,76 @@ jobs:
       # 🔹 ESLint + Unit Tests + Coverage
       #####################################
       - name: Run ESLint
-        run: cd node
+        run: cd node && npx eslint . --format json -o ../eslint-report.json || true
+
+      - name: Upload ESLint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-report
+          path: eslint-report.json
+
+      - name: Run Unit Tests with Coverage
+        run: cd node && npm test -- --coverage --json --outputFile=../jest-report.json || true
+
+      - name: Upload Test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-report
+          path: jest-report.json
+
+      #####################################
+      # 🔹 IaC Scan (Checkov)
+      #####################################
+      - name: Run Checkov for IaC security
+        run: checkov -d . --output json > checkov-report.json || true
+
+      - name: Upload Checkov report
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-report.json
+
+      #####################################
+      # 🔹 Cleanup
+      #####################################
+      - name: Stop and remove container
+        if: always()
+        run: docker rm -f node-app
+
+  #####################################
+  # 🔹 Static Analysis (CodeQL)
+  #####################################
+  codeql-analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          output: codeql-results
+
+      - name: Upload CodeQL results
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results
+          path: codeql-results
