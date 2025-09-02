@@ -34,7 +34,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./node
-          file: ./Dockerfile
+          file: ./node/Dockerfile
           push: false
           tags: node-hello-world:latest
           cache-from: type=gha
