@@ -23,7 +23,7 @@ jobs:
 
       # Сборка Docker-образа
       - name: Build Docker image
-        run: docker build -t node-hello-world .
+        run: cd node; docker build -t node-hello-world .
 
       # Запуск контейнера для теста
       - name: Run Docker container
