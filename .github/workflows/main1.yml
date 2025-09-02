@@ -20,9 +20,10 @@ jobs:
         uses: actions/checkout@v4
 
       # Запуск контейнера для теста
-      - name: Change directory
-        run: |
-          cd node
+      #- name: Change directory
+       # run: |
+       #   cd node
+       #   pwd
           
       # Устанавливаем Docker Buildx
       - name: Set up Docker Buildx
@@ -32,7 +33,7 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./node
           file: ./Dockerfile
           push: false
           tags: node-hello-world:latest
