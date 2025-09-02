@@ -5,3 +5,4 @@
 5. write docker compose file for testing of all component, and easy test FE, MW, DB parallel.
 6. write all deployment and service from all component for kubernetes
 7. test
+8
