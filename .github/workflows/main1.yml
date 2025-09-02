@@ -1,35 +1,66 @@
-name: Build, Test and Scan Docker Image
+name: Full Dev + DevSecOps Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
-  build-test-scan:
+  build-test-security:
     runs-on: ubuntu-latest
 
     steps:
-
-          
-      # Проверяем код из репозитория
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Запуск контейнера для теста
-      #- name: Change directory
-       # run: |
-       #   cd node
-       #   pwd
-          
-      # Устанавливаем Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Сборка Docker-образа
+      #####################################
+      # 🔹 Secrets Scan (Gitleaks)
+      #####################################
+      - name: Scan for secrets with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --no-banner --report-format json --report-path gitleaks-report.json
+
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+      #####################################
+      # 🔹 Dependency Audit (npm audit)
+      #####################################
+      - name: Install dependencies
+        run: cd node && npm install
+
+      - name: Run npm audit
+        run: cd node && npm audit --json > ../npm-audit-report.json || true
+
+      - name: Upload npm audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+
+      #####################################
+      # 🔹 Lint Dockerfile (Hadolint)
+      #####################################
+      - name: Lint Dockerfile with Hadolint
+        run: hadolint ./node/Dockerfile | tee hadolint-report.txt
+
+      - name: Upload Hadolint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadolint-report
+          path: hadolint-report.txt
+
+      #####################################
+      # 🔹 Build Docker image
+      #####################################
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
@@ -40,24 +71,140 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Запуск контейнера для теста
+      #####################################
+      # 🔹 Run & Test container
+      #####################################
       - name: Run Docker container
         run: |
           docker run -d -p 3000:3000 --name node-app node-hello-world:latest
           sleep 5
           curl --fail http://localhost:3000 || exit 1
 
-      # Проверка контейнера на уязвимости с помощью Trivy
+      #####################################
+      # 🔹 Container Scan (Trivy)
+      #####################################
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          image-ref: node-hello-world:latest
-          format: table
-          exit-code: 1
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+        run: trivy image --format json --output trivy-report.json node-hello-world:latest
 
-      # Останавливаем и очищаем контейнер
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
+      #####################################
+      # 🔹 Docker Best Practices (Dockle)
+      #####################################
+      - name: Check Docker best practices with Dockle
+        run: dockle -f json -o dockle-report.json node-hello-world:latest || true
+
+      - name: Upload Dockle report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockle-report
+          path: dockle-report.json
+
+      #####################################
+      # 🔹 SBOM (Syft)
+      #####################################
+      - name: Generate SBOM with Syft
+        run: syft packages docker:node-hello-world:latest -o json > sbom.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+
+      #####################################
+      # 🔹 DAST (OWASP ZAP)
+      #####################################
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: "http://localhost:3000"
+          cmd_options: "-I -r zap-report.html"
+
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-report.html
+
+      #####################################
+      # 🔹 ESLint + Unit Tests + Coverage
+      #####################################
+      - name: Run ESLint
+        run: cd node && npx eslint . --format json -o ../eslint-report.json || true
+
+      - name: Upload ESLint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-report
+          path: eslint-report.json
+
+      - name: Run Unit Tests with Coverage
+        run: cd node && npm test -- --coverage --json --outputFile=../jest-report.json || true
+
+      - name: Upload Test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-report
+          path: jest-report.json
+
+      #####################################
+      # 🔹 IaC Scan (Checkov)
+      #####################################
+      - name: Run Checkov for IaC security
+        run: checkov -d . --output json > checkov-report.json || true
+
+      - name: Upload Checkov report
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-report.json
+
+      #####################################
+      # 🔹 Cleanup
+      #####################################
       - name: Stop and remove container
         if: always()
         run: docker rm -f node-app
+
+  #####################################
+  # 🔹 Static Analysis (CodeQL)
+  #####################################
+  codeql-analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          output: codeql-results
+
+      - name: Upload CodeQL results
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results
+          path: codeql-results
