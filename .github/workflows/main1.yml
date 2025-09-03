@@ -43,12 +43,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Save Docker image
+        run: docker save node-hello-world:latest -o node-hello-world.tar
+
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: node-hello-world:latest
+          input: node-hello-world.tar
           format: json
           output: trivy-report.json
+
       - uses: actions/upload-artifact@v4
         with:
           name: trivy-report
